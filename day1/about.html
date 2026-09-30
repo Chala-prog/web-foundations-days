@@ -20,38 +20,69 @@
 
   <main>
     <h2>About QuickNotes</h2>
-    <p>QuickNotes is a lightweight web application designed to help you organize your daily thoughts and tasks instantly in your browser.</p>
+    <p>QuickNotes is a lightweight web application designed to give you a distraction-free environment for capturing ideas and organizing tasks quickly.</p>
 
     <section>
-      <h3>Features</h3>
+      <h3>How to use QuickNotes</h3>
+      <ol>
+        <li>Open the application in your preferred web browser.</li>
+        <li>Type your notes into the interactive text editor.</li>
+        <li>Save or organize your entries using keyboard shortcuts.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h3>Key Features</h3>
       <ul>
-        <li>Instant browser autosave.</li>
-        <li>Clean, distraction-free interface.</li>
-        <li>Full keyboard accessibility.</li>
+        <li>Automatic local browser persistence.</li>
+        <li>Clean and minimal interface design.</li>
+        <li>Full accessibility support and keyboard navigation.</li>
       </ul>
     </section>
 
     <section>
-      <h3>Send Feedback</h3>
+      <h3>Keyboard Shortcuts</h3>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Shortcut</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>Ctrl + N</code></td>
+            <td>Create a new note</td>
+          </tr>
+          <tr>
+            <td><code>Ctrl + S</code></td>
+            <td>Save current note</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <h3>Feedback Form</h3>
       <form action="#" method="post">
-        <div>
+        <p>
           <label for="user-name">Name:</label>
           <input type="text" id="user-name" name="user-name" required>
-        </div>
+        </p>
 
-        <div>
+        <p>
           <label for="user-email">Email:</label>
           <input type="email" id="user-email" name="user-email" required>
-        </div>
+        </p>
 
-        <div>
+        <p>
           <label for="user-message">Message:</label>
-          <textarea id="user-message" name="user-message" rows="4" required></textarea>
-        </div>
+          <textarea id="user-message" name="user-message" rows="5" required></textarea>
+        </p>
 
-        <div>
+        <p>
           <button type="submit">Submit Feedback</button>
-        </div>
+        </p>
       </form>
     </section>
   </main>
