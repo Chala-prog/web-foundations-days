@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Day 4 - Draft Editor & Theme Switcher</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Note Draft Editor</h1>
+    <button id="theme-toggle" type="button">Dark mode</button>
+  </header>
+
+  <main>
+    <div class="editor-container">
+      <label for="note-text">Write your note:</label>
+      <textarea id="note-text" placeholder="Type your note here... (Press Esc to clear)"></textarea>
+
+      <div class="counter-group">
+        <p id="char-count">0 / 200 characters</p>
+        <p id="word-count">0 words</p>
+      </div>
+
+      <div class="actions">
+        <button id="clear-btn" type="button">Clear</button>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
