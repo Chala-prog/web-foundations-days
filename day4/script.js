@@ -15,9 +15,10 @@ function getWordCount(text) {
 }
 
 /**
- * 2. Update character & word counters, styling classes, and save draft to localStorage
+ * 2. updateCounts()
+ * Updates both counters, warning/over classes, and saves draft to localStorage
  */
-function updateEditor() {
+function updateCounts() {
   const text = noteText.value;
   const length = text.length;
   const words = getWordCount(text);
@@ -46,7 +47,7 @@ function updateEditor() {
 function clearEditor() {
   noteText.value = "";
   localStorage.removeItem("note_draft");
-  updateEditor();
+  updateCounts();
   noteText.focus();
 }
 
@@ -69,8 +70,8 @@ function applyTheme(isDark) {
 // EVENT LISTENERS & INITIALIZATION
 // ==========================================
 
-// Input Event: Trigger counter updates and draft saving
-noteText.addEventListener("input", updateEditor);
+// Input Event: Trigger counter updates and draft saving on every keystroke
+noteText.addEventListener("input", updateCounts);
 
 // Keyboard Event: Clear editor when pressing Escape inside textarea
 noteText.addEventListener("keydown", (event) => {
@@ -104,8 +105,8 @@ function init() {
     applyTheme(false);
   }
 
-  // Initial update of counters
-  updateEditor();
+  // Initial update of counters and classes
+  updateCounts();
 }
 
 init();
