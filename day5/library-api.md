@@ -7,15 +7,15 @@
   * Success Code: 200 OK
 
 * **GET /api/books?author={authorName}**
-  * Description: Retrieve a list of books filtered by a specific author.
+  * Description: Retrieve a list of books filtered by a specific author using a query parameter.
   * Success Code: 200 OK
 
 * **GET /api/books/{id}**
-  * Description: Retrieve details for a single book by its ID.
+  * Description: Retrieve details for a single book by its unique ID.
   * Success Code: 200 OK
 
 * **POST /api/books**
-  * Description: Add a new book to the library collection.
+  * Description: Create and add a new book to the library collection.
   * Request Body:
     ```json
     {
@@ -28,7 +28,7 @@
   * Success Code: 201 Created
 
 * **PUT /api/books/{id}**
-  * Description: Update an existing book's details completely by its ID.
+  * Description: Update an existing book's details by its unique ID.
   * Request Body:
     ```json
     {
@@ -41,7 +41,7 @@
   * Success Code: 200 OK
 
 * **DELETE /api/books/{id}**
-  * Description: Remove a book from the library collection by its ID.
+  * Description: Remove a book from the library collection by its unique ID.
   * Success Code: 200 OK
 
 ---
@@ -50,7 +50,7 @@
 
 * **400 Bad Request**
   * Occurs when a client submits invalid or incomplete data in a request payload.
-  * Example: Sending a `POST /api/books` request without the mandatory `title` field.
+  * Example: Sending a `POST /api/books` request without the required `title` field.
 
 * **404 Not Found**
   * Occurs when the requested resource or endpoint path does not exist.
