@@ -32,6 +32,7 @@ This document details the relational schema for the school management system tar
 ### Why a Join Table is Required
 1. Direct arrays or comma-separated lists in a table column violate **First Normal Form (1NF)**.
 2. Creating duplicate student rows per course causes severe data redundancy and update anomalies.
+
 The `enrolments` join table decomposes the Many-to-Many relationship into two clean One-to-Many relationships.
 
 ---
