@@ -149,3 +149,16 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
    * *Trade-off:* Offloading thumbnail generation to a background queue keeps API upload response times nearly instantaneous for the uploader. However, if the worker queue experiences a backlog during peak traffic hours, followers might briefly see a post before its thumbnail has finished rendering (eventual consistency).
 2. **Pre-computed Feeds vs. Fan-out Write Costs:**
    * *Trade-off:* Pre-computing follower feeds into Redis upon post creation yields ultra-fast $O(1)$ feed load times. However, when high-follower accounts ("celebrity fan-out") post photos, it triggers a massive write spike across thousands of follower Redis cache keys simultaneously.
+
+   ---
+
+## 9. Commit and Push Instructions
+
+Run the following commands in your repository root terminal:
+
+```bash
+mkdir -p day7
+# Save this file to day7/photo-app-scaling.md
+git add day7/photo-app-scaling.md
+git commit -m "Day 7 assignment"
+git push origin main
