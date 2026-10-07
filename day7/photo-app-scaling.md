@@ -1,56 +1,75 @@
 # SnapShare: System Architecture & Scaling Plan
 
-This document outlines the high-level architecture and back-of-the-envelope estimations for **SnapShare**, a scalable photo-sharing application where users upload photos and scroll a feed of photos from accounts they follow.
+This document details the high-level system architecture, capacity estimations, object storage design, and operational trade-offs for **SnapShare**, a photo-sharing application.
 
 ---
 
-## 1. Assumptions
+## 1. Assumptions & Daily Active Users (DAU)
 
-* **Registered Users:** 10,000,000 users.
-* **Daily Active Users (DAU):** 10% of registered users = 1,000,000 DAU.
-* **Upload Activity:** 1 photo uploaded per active user per day.
-* **Feed Scrolling Activity:** 50 feed pages viewed per active user per day.
-* **Photo Storage Sizes:**
-  * Original photo: 2 MB ($2 \times 10^6$ bytes).
-  * Thumbnail image: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
-  * Total storage per uploaded photo: 2.05 MB.
-* **Time Estimations:** 1 day $\approx$ 100,000 seconds (exact: 86,400 seconds; scaled to 100,000 seconds for standard back-of-the-envelope system design estimates).
+* **Total Registered Users:** 10,000,000 users.
+* **Active User Rate:** 10% of total registered users active daily.
+* **Daily Active Users (DAU):** $10,000,000 \times 0.10 = \mathbf{1,000,000 \text{ DAU}}$.
+* **Upload Activity:** 1 photo per active user per day.
+* **Feed Activity:** 50 feed page views per active user per day.
+* **Payload Sizes:**
+  * Original photo file: 2 MB ($2 \times 10^6$ bytes).
+  * Thumbnail photo file: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
+  * Combined storage per upload: 2.05 MB.
+* **Time Scale Estimation:** 1 day $\approx$ 100,000 seconds (exact standard: 86,400 seconds; rounded to 100,000s for system design estimations).
 
 ---
 
 ## 2. Capacity Estimations
 
 ### A. Uploads Per Second (Writes)
-$$\text{Uploads per day} = 1,000,000 \text{ photos/day}$$
-$$\text{Uploads per second} = \frac{1,000,000 \text{ uploads}}{100,000 \text{ seconds}} = \mathbf{10 \text{ uploads/second}}$$
+* **Total Daily Uploads:** $1,000,000 \text{ uploads/day}$.
+* **Average Uploads Per Second:** 
+  $$\frac{1,000,000 \text{ uploads}}{100,000 \text{ seconds}} = \mathbf{10 \text{ uploads/second}}$$
+* **Peak Uploads Per Second ($5\times$ multiplier):** 
+  $$10 \times 5 = \mathbf{50 \text{ uploads/second}}$$
 
 ### B. Feed Views Per Second (Reads)
-$$\text{Feed views per day} = 1,000,000 \text{ DAU} \times 50 \text{ views/day} = 50,000,000 \text{ views/day}$$
-$$\text{Feed views per second} = \frac{50,000,000 \text{ views}}{100,000 \text{ seconds}} = \mathbf{500 \text{ views/second}}$$
+* **Total Daily Feed Views:** $1,000,000 \text{ DAU} \times 50 \text{ views/day} = 50,000,000 \text{ views/day}$.
+* **Average Feed Views Per Second:** 
+  $$\frac{50,000,000 \text{ views}}{100,000 \text{ seconds}} = \mathbf{500 \text{ views/second}}$$
+* **Peak Feed Views Per Second ($5\times$ multiplier):** 
+  $$500 \times 5 = \mathbf{2,500 \text{ views/second}}$$
 
-### C. Storage Required Per Year
-$$\text{Daily uploads} = 1,000,000 \text{ photos}$$
-$$\text{Daily photo storage} = 1,000,000 \times 2.05 \text{ MB} = 2,050,000 \text{ MB} = \mathbf{2.05 \text{ TB/day}}$$
-$$\text{Yearly photo storage} = 2.05 \text{ TB/day} \times 365 \text{ days} = \mathbf{748.25 \text{ TB/year}}$$
-
----
-
-## 3. System Workload Profile
-
-SnapShare is **read-heavy**. 
-
-With 500 feed views per second compared to 10 photo uploads per second, the system maintains a **50:1 Read-to-Write ratio**. The architecture prioritizes aggressive caching at the CDN and database levels to minimize primary database reads.
+### C. Photo Storage Per Year
+* **Daily Storage Added:** 
+  $$1,000,000 \text{ uploads} \times 2.05 \text{ MB} = 2,050,000 \text{ MB} = 2.05 \text{ TB/day}$$
+* **Yearly Storage Requirement:** 
+  $$2.05 \text{ TB/day} \times 365 \text{ days} = \mathbf{748.25 \text{ TB/year}}$$
 
 ---
 
-## 4. Architecture Diagram      
+## 3. Workload Profile & Architectural Implications
+
+SnapShare is heavily **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 feed views/sec vs. 10 uploads/sec).
+
+### Implications for Design:
+1. **Aggressive Edge Caching:** Dynamic feed data and static photo assets must be cached extensively using CDNs and Redis layers to prevent request flooding on origin servers.
+2. **Database Read Offloading:** The primary relational database must only process write queries (metadata inserts, user relationship writes). All read traffic is served by Read Replicas and in-memory caches.
+3. **Asynchronous Write Pipeline:** Photo processing and thumbnail generation must be decoupled from the main request-response lifecycle using background message queues.
+
+---
+
+## 4. Why Photos Must NOT Live in the Database
+
+* **Bloat & Memory Saturation:** Storing large binary BLOBs directly in relational databases causes rapid disk fragmentation and exhausts database buffer pools, reducing RAM available for indexing.
+* **Backup & Performance Degradation:** Large binaries inflate database size, slowing down query execution times, full-table scans, and automated database backups.
+* **Where They Belong Instead:** Binary photo assets belong in dedicated **Object Storage** (e.g., AWS S3, MinIO, or Cloudflare R2), which is designed for durable, scalable, and low-cost storage of unstructured binary objects. The relational database stores only the lightweight string URLs pointing to those stored objects.
+
+---
+
+## 5. System Architecture Diagram
 
 +--------------------+
                          |     Client User    |
                          +---------+----------+
                                    |
                +-------------------+-------------------+
-               | (Static Assets / Photos)              | (API Dynamic Traffic)
+               | (Static Photos/Thumbnails)            | (Dynamic API Requests)
                v                                       v
      +-------------------+                   +-------------------+
      | Content Delivery  |                   |   Load Balancer   |
@@ -66,14 +85,14 @@ With 500 feed views per second compared to 10 photo uploads per second, the syst
                |       |                               |                               |
                v       v                               v                               v
      +-------------------+                   +-------------------+                   +-------------------+
-     |   Object Storage  |                   |    Cache Layer    |                   |   Async Message   |
-     |     (e.g., S3)    |                   |   (Redis/Memcached|                   |   Queue (Rabbit)  |
+     |   Object Storage  |                   |    Cache Layer    |                   |   Message Queue   |
+     |  (e.g., AWS S3)   |                   |   (Redis Cache)   |                   | (e.g., RabbitMQ)  |
      +---------+---------+                   +-------------------+                   +---------+---------+
                ^                                                                               |
                |                                                                               v
                |                                                                     +-------------------+
-               |                                                                     |   Worker Server   |
-               +---------------------------------------------------------------------+ (Thumbnail Engine) |
+               |                                                                     |   Worker Engine   |
+               +---------------------------------------------------------------------+ (Thumbnail Generator)
                                                                                      +-------------------+
 
                                              +-------------------+
@@ -89,38 +108,37 @@ With 500 feed views per second compared to 10 photo uploads per second, the syst
                                              +-------------------+
 
 
+   ---
+
+## 6. Component Responsibilities
+
+* **CDN (Content Delivery Network):** Caches and delivers static photo assets and thumbnails from edge locations physically close to the user to reduce load times and origin bandwidth.
+* **Load Balancer:** Evenly distributes incoming HTTP API requests across a cluster of app servers to maintain high availability and prevent single-point overload.
+* **Stateless App Servers:** Handles application logic, authentication, and feed queries without storing user session state on local server memory.
+* **Cache Layer (Redis):** Stores pre-computed user feeds and frequent database query responses in memory for ultra-fast, low-latency access.
+* **Primary Database (Writes):** Processes all transactional write operations (user accounts, photo metadata, follow graphs) to ensure relational consistency.
+* **Read Replica Database:** Continuously mirrors the primary database to handle read queries and offload read pressure from the primary write node.
+* **Object Storage (AWS S3):** Provides scalable, durable, and highly cost-effective cloud storage for binary image files and thumbnails.
+* **Message Queue (RabbitMQ):** Holds asynchronous background processing tasks so client HTTP uploads complete immediately without waiting for image resizes.
+* **Worker Engine:** Fetches thumbnail creation tasks from the message queue, resizes original images down to 50 KB thumbnails, and uploads them back to Object Storage.
 
 ---
 
-## 5. Component Responsibilities
+## 7. Step-by-Step Upload Flow
 
-* **CDN (Content Delivery Network):** Caches and serves high-bandwidth photo files and static thumbnails from edge locations geographically close to users to reduce latency and origin server traffic.
-* **Load Balancer:** Distributes incoming HTTP dynamic traffic evenly across a pool of stateless application servers to prevent any single server from becoming a bottleneck.
-* **Stateless App Servers:** Handles business logic, authentication, feed assembly, and metadata queries without holding session state locally in memory.
-* **Cache (e.g., Redis):** Stores frequently accessed user feeds and database query results in RAM to reduce primary database read load.
-* **Primary Database (Writes):** Receives write operations (user profile updates, new photo metadata, comments, and follow edges) to maintain transactional consistency.
-* **Read Replica Database:** Asynchronously mirrors the primary database to handle read-only queries (e.g., loading follower profiles, searching users) and offload read traffic from the primary DB.
-* **Object Storage (e.g., AWS S3 / MinIO):** Provides scalable, durable, and cost-effective cloud storage optimized specifically for large binary unstructured files like original photo uploads.
-* **Message Queue (e.g., RabbitMQ / Kafka):** Holds asynchronous thumbnail generation tasks temporarily so photo uploads complete immediately for the client without blocking HTTP response cycles.
-* **Background Worker:** Consumes thumbnail generation jobs from the message queue, resizes the original photo down to 50 KB, and saves the generated thumbnail back into Object Storage.
+1. **Upload Initiation:** The user submits a photo upload request via the client mobile/web app containing the original 2 MB photo file and post metadata.
+2. **Load Balancing:** The Load Balancer receives the request and routes it to an available stateless App Server.
+3. **Object Storage Persist:** The App Server writes the 2 MB raw photo directly to Object Storage and receives a unique object key/URL.
+4. **Metadata Insert:** The App Server inserts a row into the Primary Database containing the photo ID, user ID, upload timestamp, and original photo Object Storage URL.
+5. **Enqueue Job & Quick Response:** The App Server places a `generate_thumbnail` job containing `photo_id` and `object_url` onto the Message Queue, and immediately returns a `201 Created` HTTP response back to the client.
+6. **Async Thumbnail Worker Execution:** A background Worker Engine picks up the job from the queue, downloads the 2 MB photo, creates a 50 KB thumbnail version, uploads the thumbnail to Object Storage, and updates the database record with the `thumbnail_url`.
+7. **Cache Update/Invalidation:** The Worker Engine or App Server updates or invalidates the relevant follower feed caches in Redis so followers see the updated post with its thumbnail on their next feed refresh.
 
 ---
 
-## 6. Step-by-Step Upload Flow
+## 8. Architectural Trade-offs
 
-1. **Client Upload Request:** The client app sends an HTTP `POST` request containing the 2 MB photo payload and metadata (caption, tags, user ID) to the Load Balancer.
-2. **Traffic Distribution:** The Load Balancer routes the incoming request to an available stateless App Server.
-3. **Save Raw Binary File:** The App Server streams and uploads the raw 2 MB photo file directly to **Object Storage** and receives back a unique image URL.
-4. **Metadata Transaction:** The App Server writes the photo record (user ID, image URL, timestamps) into the **Primary Database**.
-5. **Enqueue Thumbnail Job:** The App Server publishes an asynchronous event containing `photo_id` and `object_storage_url` to the **Message Queue**, then immediately returns a `201 Created` HTTP response back to the user.
-6. **Asynchronous Processing:** A **Background Worker** picks up the task from the Message Queue, fetches the 2 MB photo from Object Storage, generates the 50 KB thumbnail version, uploads the thumbnail back to Object Storage, and updates the database record with the new `thumbnail_url`.
-7. **Cache Update/Invalidation:** The worker or app server invalidates or updates the user's follower feed caches in **Redis** so followers see the new photo thumbnail on their next feed refresh.
-
----
-
-## 7. System Trade-offs
-
-1. **Asynchronous Processing vs. Real-Time Thumbnail Availability:**
-   * **Trade-off:** Offloading thumbnail creation to a message queue makes photo uploads near-instantaneous for the uploader. However, if queue backlog spikes, followers might experience an eventual consistency delay where the post appears in their feed a few seconds before the thumbnail finishes rendering.
-2. **Storage Cost & Write Redundancy vs. Read Performance (Pre-computed Feeds vs. Fan-out Reads):**
-   * **Trade-off:** Pre-generating and caching user feeds in Redis on every photo upload significantly improves feed read performance ($O(1)$ lookup for 500 views/sec). However, it consumes significantly more RAM and increases write amplification when high-follower accounts post photos.
+1. **Asynchronous Processing vs. Instant Thumbnail Visibility:**
+   * *Trade-off:* Offloading thumbnail generation to a background queue makes photo uploads instant for the uploader. However, if the worker queue experiences a sudden backlog, followers might briefly see a post in their feed before its thumbnail has finished rendering (eventual consistency).
+2. **Pre-computed Feeds vs. Fan-out Query Costs:**
+   * *Trade-off:* Pre-computing and storing follower feeds in Redis during photo upload makes feed page loads super fast ($O(1)$ read time). However, this increases write operations and Redis memory consumption whenever high-follower accounts post photos (the "celebrity fan-out" problem).
