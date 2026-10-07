@@ -65,6 +65,7 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
 * **Where They Go Instead:** Raw binary photo assets belong in dedicated **Object Storage** (e.g., AWS S3, Cloudflare R2, or MinIO), which is horizontally scalable, highly durable, and cost-effective for unstructured binary objects. The relational database stores only lightweight string URLs pointing to those assets.
 
 ---
+
 ## 5. System Architecture Diagram
 
                              +--------------------+
@@ -90,9 +91,9 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
                 v     v                           v                       v
       +-------------------+        +----------------+      +------------------+
       |  Object Storage  |         | Cache Layer    |      | Message Queue    |
-      | (e.g., AWS S3)   |         | (Redis Cache)  |      | (e.g., RabbitMQ) |+---------+---------+        +----------------+      +------------------+
-               ^                                                     |  
-               |                                                     v
+      | (e.g., AWS S3)   |         | (Redis Cache)  |      | (e.g., RabbitMQ )|+------------------+         +----------------+      +------------------+
+               ^                                                      |
+               |                                                      v
                |                                        +---------------------+
                |                                        |   Worker Engine     |
                +---------------------------------------+|(Thumbnail Generator)|
@@ -109,6 +110,10 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
                                     |   Read Replica    |
                                     |      (Reads)      |
                                     +-------------------+
+
+
+
+
  ---
 
 ## 6. Component Responsibilities
