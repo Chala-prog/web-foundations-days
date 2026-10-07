@@ -1,56 +1,42 @@
-# School Database Design
+# School Database Schema Design (SQLite)
 
-This document provides a conceptual overview of the relational database structure for the school management system.
+This document details the relational schema for the school management system targeting SQLite compatibility.
 
 ## Table Explanations
 
-* **`teachers`**
-  * Stores identity and contact details for instructional staff.
-  * Primary key: `id` (Unique integer auto-incremented identifier).
-  * Unique constraint: `email` prevents duplicate teacher accounts.
-
 * **`students`**
-  * Stores core identity and contact information for enrolled individuals.
-  * Primary key: `id` (Unique integer auto-incremented identifier).
-  * Unique constraint: `email` prevents multiple user registrations under the same address.
+  * Stores student profile and contact information.
+  * Primary key: `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`).
+  * Unique constraint: `email` prevents duplicate registrations.
 
 * **`courses`**
-  * Stores details about subjects/classes offered by the school.
-  * Primary key: `id` (Unique integer identifier).
-  * Foreign key: `teacher_id` references `teachers(id)`.
-  * Unique constraint: `code` enforces distinct academic identifiers (e.g., `CS101`).
+  * Stores details about academic courses offered.
+  * Primary key: `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`).
+  * Unique constraint: `code` enforces unique course identifiers (e.g., `CS101`).
 
 * **`enrolments`**
-  * Serves as the junction/join table linking students to their respective courses.
-  * Primary key: `id` (Unique integer auto-incremented identifier).
+  * Serves as the junction table resolving the Many-to-Many relationship between students and courses.
+  * Primary key: `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`).
   * Foreign keys: `student_id` references `students(id)` and `course_id` references `courses(id)`.
-  * Unique constraint: `UNIQUE(student_id, course_id)` prevents duplicate enrollments of the same student into the same class.
+  * Unique constraint: `UNIQUE(student_id, course_id)` prevents double enrollment.
+  * Attributes: Stores the `grade` earned by the student.
 
 ---
 
 ## Relationships & Join Table Justification
 
-* **Teachers to Courses (One-to-Many):** One teacher can instruct multiple courses, but each course is taught by one primary teacher.
-* **Students to Enrolments (One-to-Many):** One student can have multiple enrolment entries, but each individual enrolment record belongs to exactly one student.
-* **Courses to Enrolments (One-to-Many):** One course can have multiple enrolment entries, but each individual enrolment record belongs to exactly one course.
-* **Students to Courses (Many-to-Many):** A student can take many courses simultaneously, and a single course can contain many students.
+* **Students to Enrolments (One-to-Many):** A single student can have multiple enrollment records.
+* **Courses to Enrolments (One-to-Many):** A single course can be linked to multiple enrollment records.
+* **Students to Courses (Many-to-Many):** A student takes many courses, and a course has many students.
 
-### Why a Join Table is Necessary
-Relational databases cannot natively represent direct Many-to-Many relationships without breaking database normalization standards:
-1. Storing a list of course IDs in a single `students` column (e.g., `1,2,3`) violates First Normal Form (1NF) because column values must be atomic.
-2. Creating duplicate rows in `students` for every course enrolled causes massive data redundancy and update anomalies.
-
-The `enrolments` join table breaks down the Many-to-Many relationship into two clean One-to-Many relationships, maintaining integrity and allowing extra operational attributes like `grade` and `enrolled_at`.
+### Why a Join Table is Required
+1. Direct arrays or comma-separated lists in a table column violate **First Normal Form (1NF)**.
+2. Creating duplicate student rows per course causes severe data redundancy and update anomalies.
+The `enrolments` join table decomposes the Many-to-Many relationship into two clean One-to-Many relationships.
 
 ---
 
-## Indexing Strategy
+## Query Strategy & Indexing
 
 * **Index Target:** `CREATE INDEX idx_enrolments_student_id ON enrolments(student_id);`
-* **Reason:** Filtering enrolments by a specific student ID (e.g., fetching a student's course list or transcript) requires searching the `enrolments` table. Without an index, the database engine must perform a Full Table Scan, checking every row. Adding an index on `student_id` drastically improves query performance as the table scales.
-
----
-
-## Architectural Choice: SQL vs. NoSQL
-
-For a school administration system, **SQL (Relational Database)** is the superior choice over NoSQL. Educational records depend heavily on strict relational integrity, ACID compliance, and structured queries. SQL ensures that data inconsistencies—such as orphaned enrolment records referencing deleted students or accidental duplicate registrations—are strictly prevented at the schema level via foreign key constraints and `UNIQUE` indexes. Additionally, school systems frequently perform complex relational joins (such as generating transcripts, course rosters, and grade averages), which relational SQL databases are natively designed to handle with high efficiency.
+* **Performance Impact:** Optimizes `JOIN` operations and transcript filtering for specific students, replacing linear table scans with fast B-Tree indexing.
