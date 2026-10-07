@@ -1,20 +1,20 @@
 # SnapShare: System Architecture & Scaling Analysis
 
-This document outlines the system architecture, capacity planning, storage strategy, and architectural trade-offs for **SnapShare**, a high-scale photo-sharing application.
+This document provides a system architecture and capacity analysis for **SnapShare**, a high-scale photo-sharing web application.
 
 ---
 
 ## 1. Assumptions & Daily Active Users (DAU)
 
 ### Key Assumptions
-* **Total Registered Users:** 10,000,000 registered users.
-* **Active User Rate:** 10% of total registered users log in daily.
+* **Total Registered Users:** 10,000,000 users.
+* **Active User Rate:** 10% of total registered users log in and engage daily.
 * **Daily User Activity:**
   * **Uploads (Writes):** 1 photo upload per DAU per day.
   * **Feed Views (Reads):** 50 feed views per DAU per day.
 * **Payload Sizes:**
-  * Original photo: 2 MB ($2 \times 10^6$ bytes).
-  * Thumbnail photo: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
+  * Original photo file size: 2 MB ($2 \times 10^6$ bytes).
+  * Generated thumbnail file size: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
   * Total combined storage per upload: 2.05 MB.
 * **Time Conversion Standard:** 1 day $\approx$ 100,000 seconds (rounded from 86,400 seconds for standard system design estimations).
 
@@ -26,7 +26,7 @@ $$\text{DAU} = 10,000,000 \text{ registered users} \times 0.10 = \mathbf{1,000,0
 ## 2. Capacity Estimations
 
 ### A. Uploads Per Second (Writes)
-* **Total Daily Uploads:** $1,000,000 \text{ DAU} \times 1 \text{ photo/day} = 1,000,000 \text{ uploads/day}$.
+* **Total Daily Uploads:** $1,000,000 \text{ DAU} \times 1 \text{ upload/day} = 1,000,000 \text{ uploads/day}$.
 * **Average Uploads Per Second:**
   $$\text{Average Uploads/sec} = \frac{1,000,000 \text{ uploads}}{100,000 \text{ seconds}} = \mathbf{10 \text{ uploads/sec}}$$
 * **Peak Uploads Per Second ($5\times$ multiplier):**
@@ -52,15 +52,15 @@ $$\text{DAU} = 10,000,000 \text{ registered users} \times 0.10 = \mathbf{1,000,0
 SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 feed views/sec vs. 10 uploads/sec).
 
 ### Implications for System Design:
-1. **Aggressive Multi-Layer Caching:** Content Delivery Networks (CDNs) must be utilized to serve static images/thumbnails from edge servers, and Redis caches must be used to cache dynamic feed timelines.
-2. **Database Read Offloading:** Read queries must be routed to Database Read Replicas and in-memory caches so the Primary Relational Database handles only transactional writes (photo metadata, follow relationships).
-3. **Decoupled Asynchronous Writes:** Photo processing (resizing, thumbnails) must be decoupled from client request-response cycles using background job queues to keep application servers responsive.
+1. **Aggressive Multi-Layer Caching:** Utilize Content Delivery Networks (CDNs) to serve static photo assets and thumbnails directly from edge servers, and use Redis caches for dynamic user feed timelines.
+2. **Database Read Offloading:** Route read queries to Database Read Replicas and in-memory caches so the Primary Relational Database only handles transactional writes (photo metadata, follow relationships).
+3. **Decoupled Asynchronous Writes:** Decouple photo processing (resizing, thumbnails) from client request-response cycles using background job queues to keep application servers responsive.
 
 ---
 
 ## 4. Storage Strategy: Why Photos Belong Outside the Database
 
-* **Database Bloat & Memory Saturation:** Storing large binary objects (BLOBs) inside relational databases bloats tables, fragments disk storage, and exhausts RAM buffer pools meant for indexing database rows.
+* **Database Bloat & Memory Saturation:** Storing large binary objects (BLOBs) inside relational databases bloats tables, fragments disk storage, and exhausts RAM buffer pools meant for indexing rows.
 * **Degraded Backup & Query Performance:** Large binaries significantly slow down table scans, full database backups, restore operations, and replication lag between primary and replica nodes.
 * **Where They Go Instead:** Raw binary photo assets belong in dedicated **Object Storage** (e.g., AWS S3, Cloudflare R2, or MinIO), which is horizontally scalable, highly durable, and cost-effective for unstructured binary objects. The relational database stores only lightweight string URLs pointing to those assets.
 
