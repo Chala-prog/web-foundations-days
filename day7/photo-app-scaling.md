@@ -1,21 +1,19 @@
-# SnapShare: System Architecture & Capacity Analysis
-
-This document provides a comprehensive system architecture design, capacity planning, storage strategy, and architectural trade-off analysis for **SnapShare**, a high-scale photo-sharing application.
+# SnapShare: Scalable Photo Application System Architecture
 
 ---
 
 ## 1. Assumptions & Daily Active Users (DAU)
 
-### Key Assumptions
+### Key System Assumptions
 * **Total Registered Users:** 10,000,000 registered users.
-* **Active User Rate:** 10% of total registered users log in and interact daily.
-* **Daily User Activity:**
-  * **Uploads (Writes):** 1 photo upload per DAU per day.
-  * **Feed Views (Reads):** 50 feed views per DAU per day.
+* **Active User Conversion:** 10% of total users log in and interact daily.
+* **User Behavior Profile:**
+  * **Photo Uploads:** 1 upload per active user per day.
+  * **Feed Views:** 50 feed views per active user per day.
 * **Payload Sizes:**
-  * Original photo file size: 2 MB ($2 \times 10^6$ bytes).
-  * Generated thumbnail file size: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
-  * Total combined storage per upload: 2.05 MB.
+  * Original photo size: 2 MB ($2 \times 10^6$ bytes).
+  * Generated thumbnail size: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
+  * Total stored payload per upload: 2.05 MB.
 * **Time Conversion Standard:** 1 day $\approx$ 100,000 seconds (standard system design approximation for 86,400 seconds).
 
 ### Daily Active Users (DAU) Calculation
@@ -26,43 +24,46 @@ $$\text{DAU} = 10,000,000 \text{ registered users} \times 0.10 = \mathbf{1,000,0
 ## 2. Capacity Estimations
 
 ### A. Uploads Per Second (Writes)
-* **Total Daily Uploads:** $1,000,000 \text{ DAU} \times 1 \text{ upload/day} = 1,000,000 \text{ uploads/day}$.
+* **Total Daily Uploads:** $1,000,000 \text{ DAU} \times 1 \text{ photo/day} = 1,000,000 \text{ uploads/day}$.
 * **Average Uploads Per Second:**
   $$\text{Average Uploads/sec} = \frac{1,000,000 \text{ uploads}}{100,000 \text{ seconds}} = \mathbf{10 \text{ uploads/sec}}$$
 * **Peak Uploads Per Second ($5\times$ multiplier):**
   $$\text{Peak Uploads/sec} = 10 \text{ uploads/sec} \times 5 = \mathbf{50 \text{ uploads/sec}}$$
 
 ### B. Feed Views Per Second (Reads)
-* **Total Daily Feed Views:** $1,000,000 \text{ DAU} \times 50 \text{ feed views/day} = 50,000,000 \text{ views/day}$.
+* **Total Daily Feed Views:** $1,000,000 \text{ DAU} \times 50 \text{ views/day} = 50,000,000 \text{ views/day}$.
 * **Average Feed Views Per Second:**
   $$\text{Average Views/sec} = \frac{50,000,000 \text{ views}}{100,000 \text{ seconds}} = \mathbf{500 \text{ views/sec}}$$
 * **Peak Feed Views Per Second ($5\times$ multiplier):**
   $$\text{Peak Views/sec} = 500 \text{ views/sec} \times 5 = \mathbf{2,500 \text{ views/sec}}$$
 
-### C. Photo Storage Per Year
-* **Daily Storage Added:**
+### C. Photo Storage Capacity Per Year
+* **Daily Storage Generated:**
   $$\text{Daily Storage} = 1,000,000 \text{ uploads} \times 2.05 \text{ MB} = 2,050,000 \text{ MB} = \mathbf{2.05 \text{ TB/day}}$$
-* **Yearly Storage Requirement:**
+* **Yearly Storage Generation:**
   $$\text{Yearly Storage} = 2.05 \text{ TB/day} \times 365 \text{ days} = \mathbf{748.25 \text{ TB/year}}$$
 
 ---
 
-## 3. Workload Profile & Architectural Implications
+## 3. Workload Profile & System Design Implications
 
-SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 feed views/sec vs. 10 uploads/sec).
+SnapShare is a **read-heavy system**, operating at a **50:1 Read-to-Write ratio** (500 feed views/sec vs. 10 uploads/sec).
 
-### Implications for System Design:
-1. **Aggressive Multi-Layer Caching:** Edge CDNs must serve static image assets, while in-memory caches (Redis) handle dynamic feed query responses.
-2. **Database Read Offloading:** Read queries are routed to Database Read Replicas and in-memory caches so the Primary Relational Database only processes write transactions (photo metadata, follow relationships).
-3. **Decoupled Asynchronous Processing:** Heavy write tasks like photo resizing and thumbnail generation are offloaded to background message queues to keep API servers responsive.
+### Architectural Design Implications:
+1. **Multi-Layer Caching:** Static image files must be heavily cached at edge CDNs, while dynamic timeline responses are cached in memory using Redis to avoid touching the primary database.
+2. **Database Scaling & Read Replicas:** Read traffic is offloaded to Database Read Replicas so the Primary Relational Database handles only transactional writes (uploads, followers, metadata updates).
+3. **Asynchronous Write Pipeline:** Resource-intensive write tasks, such as photo rendering and thumbnail generation, are deferred to background worker queues to prevent blocking API responses.
 
 ---
 
-## 4. Storage Strategy: Why Photos Belong Outside the Database
+## 4. Photo Storage Strategy: Why Binary Files Do Not Belong in Databases
 
-* **Database Bloat & Memory Saturation:** Storing raw binary files (BLOBs) inside relational databases bloats table sizes, fragments disk storage, and exhausts RAM buffer pools meant for row indexing.
-* **Degraded Backup & Query Performance:** Large binary objects severely slow down database table scans, full backups, point-in-time restores, and replication streams.
-* **Where They Belong Instead:** Unstructured binary photo files belong in dedicated **Object Storage** (e.g., AWS S3, Cloudflare R2, or MinIO), which is horizontally scalable, highly durable, and cost-effective. The relational database stores only lightweight metadata and text string URLs pointing to the objects.
+### Problems with Storing Photos in a Database:
+* **Database Bloat & Memory Saturation:** Binary Large Objects (BLOBs) inflate database page sizes, exhaust RAM buffer pools meant for row indexes, and drastically degrade query performance.
+* **Backup & Replication Friction:** Massive binary data makes full database backups, point-in-time restores, and cross-region replication extremely slow and expensive.
+
+### Correct Storage Architecture:
+Unstructured binary objects belong in **Object Storage** (e.g., AWS S3, Cloudflare R2, or MinIO), which provides horizontally scalable, low-cost file storage. The relational database stores only lightweight metadata and text string object URLs (e.g., `https://cdn.snapshare.com/photos/2026/img_12345.jpg`).
 
 ---
 
@@ -117,49 +118,59 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
 
 ---
 
-## 6. Component Responsibilities
+## 6. Component Explanations
 
-* **CDN (Content Delivery Network):** Caches and delivers static photo assets and thumbnails to end users from edge locations physically close to them, reducing response latency and origin traffic.
-* **Load Balancer:** Distributes incoming application traffic evenly across multiple stateless application servers to maintain system availability and prevent single-server bottlenecks.
-* **Stateless App Servers:** Handles application logic, authentication, and user API requests without storing session state on individual web servers.
-* **Cache Layer (Redis):** Stores pre-computed user feed timelines and frequent query results in memory for sub-millisecond retrieval speeds.
-* **Primary Database (Writes):** Manages transactional write requests and ensures ACID compliance for structured relational data like user accounts, post metadata, and follower graphs.
-* **Read Replica Database:** Replicates data asynchronously from the primary database to handle read-heavy queries without overloading the primary write instance.
-* **Object Storage (AWS S3):** Provides scalable, durable, and low-cost storage specifically optimized for unstructured binary data such as full-size photos and thumbnails.
-* **Message Queue (RabbitMQ):** Holds background jobs asynchronously so image processing tasks do not slow down client HTTP upload response times.
-* **Worker Engine:** Pulls thumbnail jobs from the queue, resizes original images down to 50 KB thumbnails, uploads them to Object Storage, and updates database records.
+* **CDN (Content Delivery Network):** Caches and serves static full-size photos and thumbnails from geographically distributed edge locations to minimize retrieval latency for end users.
+* **Load Balancer:** Distributes incoming API traffic evenly across multiple stateless application servers to optimize resource utilization and prevent single-point congestion.
+* **Stateless App Servers:** Processes incoming HTTP requests, handles authentication, routes transactions, and coordinates storage streams without maintaining local session state.
+* **Cache Layer (Redis):** Stores pre-computed user feed timelines and hot data in memory to satisfy read queries in sub-milliseconds.
+* **Primary Database (Writes):** Manages user profiles, post metadata, and follower graphs while guaranteeing transactional ACID compliance for write operations.
+* **Read Replica Database:** Asynchronously replicates data from the primary database to handle feed query reads without burdening the primary write node.
+* **Object Storage (AWS S3):** Scalable storage system engineered to store unstructured binary objects like raw photos and generated thumbnails.
+* **Message Queue (RabbitMQ):** Decouples upload handling from background tasks by buffering thumbnail generation jobs.
+* **Worker Engine:** Consumes jobs from the message queue, resizes original photos into 50 KB thumbnails, stores them in Object Storage, and updates post metadata.
 
 ---
 
-## 7. Step-by-Step Upload Flow
+## 7. Step-by-Step Upload & Processing Flow
 
-1. **Upload Request:** The client application submits an HTTP `POST` request containing the 2 MB raw photo file and metadata to the API endpoint.
-2. **Load Balancing:** The Load Balancer receives the request and routes it to an available stateless App Server instance.
-3. **Persist Raw Image:** The App Server streams the 2 MB raw photo file directly into Object Storage and receives a unique object key/URL.
-4. **Write Metadata:** The App Server writes a post record containing user ID, upload timestamp, and the raw image URL to the Primary Database.
-5. **Enqueue Task & Quick Response:** The App Server pushes a `generate_thumbnail` task onto the Message Queue and immediately sends an HTTP `201 Created` response back to the client.
-6. **Async Thumbnail Processing:** A background Worker Engine retrieves the task from the queue, downloads the raw photo, resizes it to a 50 KB thumbnail, uploads the thumbnail to Object Storage, and saves the `thumbnail_url` in the database.
-7. **Cache Update/Invalidation:** The Worker Engine or App Server invalidates or updates affected follower feed caches in Redis so followers see the updated post and thumbnail on their next feed refresh.
+1. **Upload Request:** The client app sends an HTTP `POST` request containing photo binary data and metadata to the API endpoint.
+2. **Traffic Distribution:** The Load Balancer intercepts the upload request and forwards it to an available stateless App Server instance.
+3. **Persist Raw Image:** The App Server streams the 2 MB raw photo directly to Object Storage and receives a unique object reference URL.
+4. **Write Metadata:** The App Server writes the post details (user ID, timestamp, raw image URL) into the Primary Database.
+5. **Enqueue Thumbnail Job:** The App Server emits a `create_thumbnail` job into the Message Queue and immediately returns an HTTP `201 Created` status code to the user.
+6. **Async Thumbnail Processing:** A background Worker Engine picks up the job from the queue, downloads the original image, scales it down to a 50 KB thumbnail, uploads the thumbnail to Object Storage, and writes the `thumbnail_url` back to the database.
+7. **Feed Cache Invalidation:** The Worker Engine or App Server invalidates or updates the affected follower feed caches in Redis so followers see the updated post upon their next feed refresh.
 
 ---
 
 ## 8. Architectural Trade-offs
 
-1. **Asynchronous Thumbnail Processing vs. Instant Thumbnail Availability:**
-   * *Trade-off:* Offloading thumbnail generation to background message queue workers keeps API upload response times fast and non-blocking for the uploader. However, if the worker queue experiences a backlog during traffic spikes, followers may briefly view a post before its thumbnail has finished rendering (eventual consistency).
-2. **Pre-computed Feeds vs. Fan-out Write Cost:**
-   * *Trade-off:* Pre-computing follower feeds into Redis on post creation enables sub-millisecond $O(1)$ feed reads. However, when accounts with large follower counts ("celebrity fan-out") publish a photo, it triggers a massive write spike across thousands of follower Redis cache keys simultaneously.
+1. **Asynchronous Background Processing vs. Instant Thumbnail Availability:**
+   * *Trade-off:* Offloading thumbnail generation to a background message queue keeps HTTP upload response times fast and non-blocking for the uploader. However, during high-traffic spikes, queue delays may mean followers briefly view a post before its thumbnail finish rendering (eventual consistency).
+2. **Pre-computed Feed Caching vs. Fan-out Write Amplification:**
+   * *Trade-off:* Pre-computing user feeds in Redis on post creation allows instantaneous $O(1)$ read performance for timeline requests. However, when high-profile accounts ("celebrities") post a photo, it triggers a write spike across thousands of follower feed caches simultaneously.
 
 ---
 
-## 9. Commit and Push Instructions
+## 9. Git Commit & Deployment Steps
 
-Save this file into `day7/photo-app-scaling.md` and execute the following commands in your terminal:
+Execute the following commands in your local workspace terminal to commit and push the completed Day 7 assignment:
 
 ```bash
+# Navigate to repository root directory
+cd web-foundations-days
+
+# Create directory if it does not exist
 mkdir -p day7
+
+# Stage the markdown assignment file
 git add day7/photo-app-scaling.md
+
+# Commit with the required message
 git commit -m "Day 7 assignment"
+
+# Push to the main remote branch
 git push origin main
 
 
