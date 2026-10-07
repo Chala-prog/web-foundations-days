@@ -1,6 +1,6 @@
-# SnapShare: System Architecture & Scaling Analysis
+# SnapShare: System Architecture & Capacity Analysis
 
-This document provides a system architecture design, capacity planning, storage strategy, and architectural trade-off analysis for **SnapShare**, a high-scale photo-sharing application.
+This document provides a comprehensive system architecture design, capacity planning, storage strategy, and architectural trade-off analysis for **SnapShare**, a high-scale photo-sharing application.
 
 ---
 
@@ -115,7 +115,7 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
 
 
 
- ---
+---
 
 ## 6. Component Responsibilities
 
@@ -154,7 +154,7 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
 
 ## 9. Commit and Push Instructions
 
-Save this content into `day7/photo-app-scaling.md` and execute the following Git commands in your terminal:
+Save this file into `day7/photo-app-scaling.md` and execute the following commands in your terminal:
 
 ```bash
 mkdir -p day7
@@ -162,4 +162,5 @@ git add day7/photo-app-scaling.md
 git commit -m "Day 7 assignment"
 git push origin main
 
-<FollowUp label="Want to explore strategies for handling celebrity fan-out writes in Redis?" query="How can we handle celebrity fan-out writes efficiently in a read-heavy photo app feed?"/>
+
+<FollowUp label="Want to inspect how to handle celebrity fan-out writes in Redis?" query="How can we optimize celebrity fan-out writes in a read-heavy photo application?"/>
