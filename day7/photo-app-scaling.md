@@ -91,7 +91,8 @@ SnapShare is **read-heavy**, operating at a **50:1 Read-to-Write ratio** (500 fe
                 v     v                           v                       v
       +-------------------+        +----------------+      +------------------+
       |  Object Storage  |         | Cache Layer    |      | Message Queue    |
-      | (e.g., AWS S3)   |         | (Redis Cache)  |      | (e.g., RabbitMQ )|+------------------+         +----------------+      +------------------+
+      | (e.g., AWS S3)   |         | (Redis Cache)  |      | (e.g., RabbitMQ )|
+      +------------------+         +----------------+      +------------------+
                ^                                                      |
                |                                                      v
                |                                        +---------------------+
