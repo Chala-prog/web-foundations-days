@@ -38,7 +38,7 @@ CREATE TABLE enrolments (
     UNIQUE (student_id, course_id)
 );
 
--- Performance Index
+-- Performance Index for Student Lookups
 CREATE INDEX idx_enrolments_student_id ON enrolments(student_id);
 
 -- ==========================================
