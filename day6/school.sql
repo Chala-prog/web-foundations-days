@@ -1,4 +1,4 @@
--- Enable foreign key constraint support in SQLite
+-- Enable foreign key constraints in SQLite
 PRAGMA foreign_keys = ON;
 
 -- ==========================================
