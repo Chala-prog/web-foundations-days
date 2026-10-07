@@ -18,7 +18,7 @@ This document details the relational schema for the school management system tar
   * Serves as the junction table resolving the Many-to-Many relationship between students and courses.
   * Primary key: `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`).
   * Foreign keys: `student_id` references `students(id)` and `course_id` references `courses(id)`.
-  * Unique constraint: `UNIQUE(student_id, course_id)` prevents double enrollment.
+  * Unique constraint: `UNIQUE(student_id, course_id)` prevents duplicate enrollments.
   * Attributes: Stores the `grade` earned by the student.
 
 ---

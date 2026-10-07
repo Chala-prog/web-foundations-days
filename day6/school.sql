@@ -1,4 +1,4 @@
--- Enable foreign key constraints in SQLite
+-- Enable foreign key constraint support in SQLite
 PRAGMA foreign_keys = ON;
 
 -- ==========================================
@@ -12,7 +12,7 @@ DROP TABLE IF EXISTS students;
 -- 2. CREATE TABLE STATEMENTS
 -- ==========================================
 
--- Students Table
+-- Students Entity
 CREATE TABLE students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     first_name TEXT NOT NULL,
@@ -20,14 +20,14 @@ CREATE TABLE students (
     email TEXT UNIQUE NOT NULL
 );
 
--- Courses Table
+-- Courses Entity
 CREATE TABLE courses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
     title TEXT NOT NULL
 );
 
--- Enrolments Table (Junction Table holding grade)
+-- Enrolments Junction Entity (Holds Grade)
 CREATE TABLE enrolments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE enrolments (
     UNIQUE (student_id, course_id)
 );
 
--- Performance Index for Student Lookups
+-- B-Tree Performance Index
 CREATE INDEX idx_enrolments_student_id ON enrolments(student_id);
 
 -- ==========================================
