@@ -1,46 +1,48 @@
-# SnapShare: Scalable Photo Application System Architecture
+# SnapShare: System Architecture & Capacity Analysis
+
+This document outlines the architectural blueprint, capacity estimations, storage strategy, and system trade-offs for **SnapShare**, a high-scale photo-sharing platform.
 
 ---
 
 ## 1. Assumptions & Daily Active Users (DAU)
 
-### Key System Assumptions
+### System Baseline
 * **Total Registered Users:** 10,000,000 registered users.
-* **Active User Conversion:** 10% of total users log in and interact daily.
-* **User Behavior Profile:**
-  * **Photo Uploads:** 1 upload per active user per day.
-  * **Feed Views:** 50 feed views per active user per day.
-* **Payload Sizes:**
-  * Original photo size: 2 MB ($2 \times 10^6$ bytes).
-  * Generated thumbnail size: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
-  * Total stored payload per upload: 2.05 MB.
+* **Daily Active User Rate:** 10% of total registered users log in and interact daily.
+* **Per-User Activity:**
+  * **Uploads (Writes):** 1 photo upload per active user per day.
+  * **Feed Views (Reads):** 50 feed views per active user per day.
+* **Asset Payload Sizes:**
+  * Original photo file size: 2 MB ($2 \times 10^6$ bytes).
+  * Generated thumbnail file size: 50 KB ($50 \times 10^3$ bytes = 0.05 MB).
+  * Combined storage generated per upload: 2.05 MB.
 * **Time Conversion Standard:** 1 day $\approx$ 100,000 seconds (standard system design approximation for 86,400 seconds).
 
-### Daily Active Users (DAU) Calculation
+### Daily Active Users (DAU)
 $$\text{DAU} = 10,000,000 \text{ registered users} \times 0.10 = \mathbf{1,000,000 \text{ DAU}}$$
 
 ---
 
 ## 2. Capacity Estimations
 
-### A. Uploads Per Second (Writes)
+### A. Photo Uploads Per Second (Writes)
 * **Total Daily Uploads:** $1,000,000 \text{ DAU} \times 1 \text{ photo/day} = 1,000,000 \text{ uploads/day}$.
-* **Average Uploads Per Second:**
+* **Average Uploads/sec:**
   $$\text{Average Uploads/sec} = \frac{1,000,000 \text{ uploads}}{100,000 \text{ seconds}} = \mathbf{10 \text{ uploads/sec}}$$
-* **Peak Uploads Per Second ($5\times$ multiplier):**
+* **Peak Uploads/sec ($5\times$ multiplier):**
   $$\text{Peak Uploads/sec} = 10 \text{ uploads/sec} \times 5 = \mathbf{50 \text{ uploads/sec}}$$
 
 ### B. Feed Views Per Second (Reads)
-* **Total Daily Feed Views:** $1,000,000 \text{ DAU} \times 50 \text{ views/day} = 50,000,000 \text{ views/day}$.
-* **Average Feed Views Per Second:**
-  $$\text{Average Views/sec} = \frac{50,000,000 \text{ views}}{100,000 \text{ seconds}} = \mathbf{500 \text{ views/sec}}$$
-* **Peak Feed Views Per Second ($5\times$ multiplier):**
-  $$\text{Peak Views/sec} = 500 \text{ views/sec} \times 5 = \mathbf{2,500 \text{ views/sec}}$$
+* **Total Daily Feed Views:** $1,000,000 \text{ DAU} \times 50 \text{ feed views/day} = 50,000,000 \text{ views/day}$.
+* **Average Feed Views/sec:**
+  $$\text{Average Feed Views/sec} = \frac{50,000,000 \text{ views}}{100,000 \text{ seconds}} = \mathbf{500 \text{ views/sec}}$$
+* **Peak Feed Views/sec ($5\times$ multiplier):**
+  $$\text{Peak Feed Views/sec} = 500 \text{ views/sec} \times 5 = \mathbf{2,500 \text{ views/sec}}$$
 
-### C. Photo Storage Capacity Per Year
-* **Daily Storage Generated:**
+### C. Photo Storage Per Year
+* **Daily Storage Added:**
   $$\text{Daily Storage} = 1,000,000 \text{ uploads} \times 2.05 \text{ MB} = 2,050,000 \text{ MB} = \mathbf{2.05 \text{ TB/day}}$$
-* **Yearly Storage Generation:**
+* **Yearly Storage Requirement:**
   $$\text{Yearly Storage} = 2.05 \text{ TB/day} \times 365 \text{ days} = \mathbf{748.25 \text{ TB/year}}$$
 
 ---
@@ -49,21 +51,21 @@ $$\text{DAU} = 10,000,000 \text{ registered users} \times 0.10 = \mathbf{1,000,0
 
 SnapShare is a **read-heavy system**, operating at a **50:1 Read-to-Write ratio** (500 feed views/sec vs. 10 uploads/sec).
 
-### Architectural Design Implications:
-1. **Multi-Layer Caching:** Static image files must be heavily cached at edge CDNs, while dynamic timeline responses are cached in memory using Redis to avoid touching the primary database.
-2. **Database Scaling & Read Replicas:** Read traffic is offloaded to Database Read Replicas so the Primary Relational Database handles only transactional writes (uploads, followers, metadata updates).
-3. **Asynchronous Write Pipeline:** Resource-intensive write tasks, such as photo rendering and thumbnail generation, are deferred to background worker queues to prevent blocking API responses.
+### Design Implications:
+1. **Aggressive Multi-Tier Caching:** Caches static images at geographically edge-distributed CDNs, and holds dynamic feed responses in memory (Redis) to bypass the primary database.
+2. **Database Read Offloading:** Read queries are routed to dedicated Database Read Replicas, isolating the Primary Relational Database so it strictly handles transactional writes.
+3. **Decoupled Asynchronous Writes:** High-overhead background write workloads, such as photo resizing and thumbnail rendering, are offloaded to message queues to keep upload endpoints fast and responsive.
 
 ---
 
-## 4. Photo Storage Strategy: Why Binary Files Do Not Belong in Databases
+## 4. Storage Strategy: Why Photos Do Not Belong inside the Database
 
-### Problems with Storing Photos in a Database:
-* **Database Bloat & Memory Saturation:** Binary Large Objects (BLOBs) inflate database page sizes, exhaust RAM buffer pools meant for row indexes, and drastically degrade query performance.
-* **Backup & Replication Friction:** Massive binary data makes full database backups, point-in-time restores, and cross-region replication extremely slow and expensive.
+### Problems with Storing Binary Files in Relational Databases:
+* **Database Bloat & Memory Saturation:** Storing Binary Large Objects (BLOBs) inflates database table sizes, exhausts RAM buffer pools meant for row indexes, and degrades overall query execution speeds.
+* **Backup & Replication Strain:** Massive binary files slow down database table scans, full system backups, point-in-time restores, and cross-region replication streams.
 
-### Correct Storage Architecture:
-Unstructured binary objects belong in **Object Storage** (e.g., AWS S3, Cloudflare R2, or MinIO), which provides horizontally scalable, low-cost file storage. The relational database stores only lightweight metadata and text string object URLs (e.g., `https://cdn.snapshare.com/photos/2026/img_12345.jpg`).
+### Storage Solution:
+Unstructured binary photo files are stored in **Object Storage** (e.g., AWS S3, Cloudflare R2, or MinIO), which is horizontally scalable, highly durable, and cost-effective. The relational database stores only lightweight metadata and text string object URLs (e.g., `https://cdn.snapshare.com/photos/2026/img_1001.jpg`).
 
 ---
 
@@ -73,33 +75,33 @@ Unstructured binary objects belong in **Object Storage** (e.g., AWS S3, Cloudfla
                              |     Client User    |
                              +---------+----------+
                                        |
-               +-------------------+-----------------------+
-               |(Static Photos/Thumbnails)                 |(Dynamic API 
-               |                                           |   Requests)      
-               v                                           v
-         +-------------------+                   +-------------------+
-         | Content Delivery  |                   |   Load Balancer   |
-         |   Network (CDN)   |                   +---------+---------+
-         +---------+---------+                             |
-                |                                          v
-                |                          +----------------------+
-                |                          |    App Servers       |
-                |                          |    (Stateless)       |
-                |                          +------+-----+-----+---+
-                |                          |      |      |
-                |     +--------------------+      |      +----------------+
-                |     |                           |                       |  
-                v     v                           v                       v
-      +-------------------+        +----------------+      +------------------+
-      |  Object Storage  |         | Cache Layer    |      | Message Queue    |
-      | (e.g., AWS S3)   |         | (Redis Cache)  |      | (e.g., RabbitMQ )|
-      +------------------+         +----------------+      +------------------+
-               ^                                                      |
-               |                                                      v
-               |                                        +---------------------+
-               |                                        |   Worker Engine     |
-               +---------------------------------------+|(Thumbnail Generator)|
-                                                        +---------------------+
+                      +--------------------+-----------------------------+
+                      |(Static Photos/Thumbnails)           |(Dynamic API 
+                      |                                     |  Requests)      
+                      v                                     v
+             +-------------------+                   +-------------------+
+             | Content Delivery  |                   |   Load Balancer   |
+             |   Network (CDN)   |                   +---------+---------+
+             +---------+---------+                             |
+                    |                                          v
+                    |                          +----------------------+
+                    |                          |    App Servers       |
+                    |                          |    (Stateless)       |
+                    |                          +------+-----+-----+---+
+                    |                          |      |      |
+                    |     +--------------------+      |      +----------------+
+                    |     |                           |               |   
+                    v     v                           v               v
+                +----------------+        +--------------+      +---------------+
+                | Object Storage |         | Cache Layer |      | Message Queue  |
+                |(e.g., AWS S3)  |         |(Redis Cache)|      |(e.g., RabbitMQ)|
+                +----------------+         +-------------+      +----------------+
+                    ^                                                      |
+                    |                                                      v
+                    |                                        +-------------------+
+                    |                                        |  Worker Engine    |
+                    +-------------------------------------+|(Thumbnail Generator)|
+                                                            +--------------------+
                                                                                          
                                    +-------------------+
                                    |  Primary Database |
@@ -120,57 +122,57 @@ Unstructured binary objects belong in **Object Storage** (e.g., AWS S3, Cloudfla
 
 ## 6. Component Explanations
 
-* **CDN (Content Delivery Network):** Caches and serves static full-size photos and thumbnails from geographically distributed edge locations to minimize retrieval latency for end users.
-* **Load Balancer:** Distributes incoming API traffic evenly across multiple stateless application servers to optimize resource utilization and prevent single-point congestion.
-* **Stateless App Servers:** Processes incoming HTTP requests, handles authentication, routes transactions, and coordinates storage streams without maintaining local session state.
-* **Cache Layer (Redis):** Stores pre-computed user feed timelines and hot data in memory to satisfy read queries in sub-milliseconds.
-* **Primary Database (Writes):** Manages user profiles, post metadata, and follower graphs while guaranteeing transactional ACID compliance for write operations.
-* **Read Replica Database:** Asynchronously replicates data from the primary database to handle feed query reads without burdening the primary write node.
-* **Object Storage (AWS S3):** Scalable storage system engineered to store unstructured binary objects like raw photos and generated thumbnails.
-* **Message Queue (RabbitMQ):** Decouples upload handling from background tasks by buffering thumbnail generation jobs.
-* **Worker Engine:** Consumes jobs from the message queue, resizes original photos into 50 KB thumbnails, stores them in Object Storage, and updates post metadata.
+* **CDN (Content Delivery Network):** Caches and serves static full-size photos and thumbnails from edge locations close to users to reduce retrieval latency and origin bandwidth.
+* **Load Balancer:** Distributes incoming network traffic evenly across stateless application servers to maintain application availability and prevent single-server bottlenecks.
+* **Stateless App Servers:** Processes incoming HTTP user requests, manages authentication, and coordinates business logic without retaining session state on local hardware.
+* **Cache Layer (Redis):** Stores pre-computed feed timelines and active user sessions in memory for sub-millisecond retrieval.
+* **Primary Database (Writes):** Handles relational database write operations and guarantees transactional ACID compliance for user accounts, post metadata, and follower relationships.
+* **Read Replica Database:** Replicates data asynchronously from the primary database to serve feed query reads without burdening the primary write node.
+* **Object Storage (AWS S3):** Holds unstructured binary image data and thumbnails in a scalable, highly durable file repository.
+* **Message Queue (RabbitMQ):** Holds asynchronous background processing tasks so that intensive media workloads do not block HTTP client upload responses.
+* **Worker Engine:** Pulls thumbnail rendering jobs from the message queue, resizes raw images to 50 KB thumbnails, saves them to Object Storage, and updates post metadata.
 
 ---
 
-## 7. Step-by-Step Upload & Processing Flow
+## 7. Step-by-Step Photo Upload Flow
 
-1. **Upload Request:** The client app sends an HTTP `POST` request containing photo binary data and metadata to the API endpoint.
-2. **Traffic Distribution:** The Load Balancer intercepts the upload request and forwards it to an available stateless App Server instance.
-3. **Persist Raw Image:** The App Server streams the 2 MB raw photo directly to Object Storage and receives a unique object reference URL.
-4. **Write Metadata:** The App Server writes the post details (user ID, timestamp, raw image URL) into the Primary Database.
-5. **Enqueue Thumbnail Job:** The App Server emits a `create_thumbnail` job into the Message Queue and immediately returns an HTTP `201 Created` status code to the user.
-6. **Async Thumbnail Processing:** A background Worker Engine picks up the job from the queue, downloads the original image, scales it down to a 50 KB thumbnail, uploads the thumbnail to Object Storage, and writes the `thumbnail_url` back to the database.
-7. **Feed Cache Invalidation:** The Worker Engine or App Server invalidates or updates the affected follower feed caches in Redis so followers see the updated post upon their next feed refresh.
+1. **Upload Request:** The user's device sends an HTTP `POST` request containing raw 2 MB photo binary data and metadata to the API endpoint.
+2. **Traffic Load Balancing:** The Load Balancer intercepts the incoming request and routes it to an available stateless App Server instance.
+3. **Persist Raw Photo:** The App Server streams the 2 MB raw photo directly into Object Storage (AWS S3) and receives back a unique object key/URL.
+4. **Persist Metadata:** The App Server records the post metadata (User ID, timestamp, raw image URL) into the Primary Database.
+5. **Enqueue Task & Quick HTTP Response:** The App Server emits a `generate_thumbnail` task onto the Message Queue and immediately sends an HTTP `201 Created` response back to the client.
+6. **Async Thumbnail Processing:** A background Worker Engine retrieves the task from the queue, downloads the raw photo, resizes it down to a 50 KB thumbnail, uploads the thumbnail to Object Storage, and attaches the `thumbnail_url` to the post record in the database.
+7. **Cache Invalidation:** The Worker Engine or App Server invalidates or updates the affected follower feed caches in Redis so followers see the updated post and thumbnail on their next feed refresh.
 
 ---
 
 ## 8. Architectural Trade-offs
 
-1. **Asynchronous Background Processing vs. Instant Thumbnail Availability:**
-   * *Trade-off:* Offloading thumbnail generation to a background message queue keeps HTTP upload response times fast and non-blocking for the uploader. However, during high-traffic spikes, queue delays may mean followers briefly view a post before its thumbnail finish rendering (eventual consistency).
+1. **Asynchronous Processing vs. Instant Thumbnail Availability:**
+   * *Trade-off:* Moving thumbnail creation to a background message queue keeps HTTP upload response times fast and non-blocking for the uploader. However, during high-traffic spikes, message queue backlogs may cause followers to briefly view a post before its thumbnail finish rendering (eventual consistency).
 2. **Pre-computed Feed Caching vs. Fan-out Write Amplification:**
-   * *Trade-off:* Pre-computing user feeds in Redis on post creation allows instantaneous $O(1)$ read performance for timeline requests. However, when high-profile accounts ("celebrities") post a photo, it triggers a write spike across thousands of follower feed caches simultaneously.
+   * *Trade-off:* Pre-computing follower feeds into Redis on post creation allows instantaneous $O(1)$ read performance for timeline queries. However, when high-profile accounts ("celebrities") post a photo, it triggers a massive write spike across thousands of follower feed caches simultaneously.
 
 ---
 
-## 9. Git Commit & Deployment Steps
+## 9. Git Execution Commands
 
-Execute the following commands in your local workspace terminal to commit and push the completed Day 7 assignment:
+To save, commit, and push your work to your remote GitHub repository, run the following commands in your terminal:
 
 ```bash
 # Navigate to repository root directory
 cd web-foundations-days
 
-# Create directory if it does not exist
+# Ensure day7 directory exists
 mkdir -p day7
 
-# Stage the markdown assignment file
+# Stage the file
 git add day7/photo-app-scaling.md
 
-# Commit with the required message
+# Commit with the exact required commit message
 git commit -m "Day 7 assignment"
 
-# Push to the main remote branch
+# Push to the remote main branch
 git push origin main
 
 
