@@ -104,11 +104,9 @@ SnapShare is heavily **read-heavy**, operating at a **50:1 Read-to-Write ratio**
                                                        v
                                              +-------------------+
                                              |   Read Replica    |
-                                             |      (Reads)      |
                                              +-------------------+
 
-
-   ---
+ ---
 
 ## 6. Component Responsibilities
 
@@ -141,4 +139,4 @@ SnapShare is heavily **read-heavy**, operating at a **50:1 Read-to-Write ratio**
 1. **Asynchronous Processing vs. Instant Thumbnail Visibility:**
    * *Trade-off:* Offloading thumbnail generation to a background queue makes photo uploads instant for the uploader. However, if the worker queue experiences a sudden backlog, followers might briefly see a post in their feed before its thumbnail has finished rendering (eventual consistency).
 2. **Pre-computed Feeds vs. Fan-out Query Costs:**
-   * *Trade-off:* Pre-computing and storing follower feeds in Redis during photo upload makes feed page loads super fast ($O(1)$ read time). However, this increases write operations and Redis memory consumption whenever high-follower accounts post photos (the "celebrity fan-out" problem).
+   * *Trade-off:* Pre-computing and storing follower feeds in Redis during photo upload makes feed page loads super fast ($O(1)$ read time). However, this increases write operations and Redis memory consumption whenever high-follower accounts post photos (the "celebrity fan-out" problem).                                               
