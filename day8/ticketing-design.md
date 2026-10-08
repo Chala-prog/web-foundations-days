@@ -42,8 +42,8 @@
   $$\text{Peak Writes/sec} = \frac{200,000 \text{ hold attempts}}{600 \text{ seconds}} \approx 333.3 \text{ TPS}$$
 
 ### C. Traffic Comparison Analysis
-* **Read Surge Factor:** $\frac{5,000 \text{ QPS}}{5.8 \text{ QPS}} \approx 862\times$ increase over normal daily operations.
-* **Write Surge Factor:** $\frac{333.3 \text{ TPS}}{0.058 \text{ TPS}} \approx 5,746\times$ increase over normal daily operations.
+* **Read Surge Factor:** $\frac{5,000 \text{ QPS}}{5.8 \text{ QPS}} \approx \mathbf{862\times \text{ increase}}$ over normal daily operations.
+* **Write Surge Factor:** $\frac{333.3 \text{ TPS}}{0.058 \text{ TPS}} \approx \mathbf{5,746\times \text{ increase}}$ over normal daily operations.
 * **Architectural Takeaway:** The database cannot sustain raw unthrottled write throughput spikes of 333.3 TPS alongside 5,000 QPS query reads without falling over. Caching layers and virtual waiting rooms are strictly mandatory.
 
 ---
@@ -65,3 +65,5 @@
       }
     ]
   }
+
+  
