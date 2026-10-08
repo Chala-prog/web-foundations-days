@@ -436,14 +436,14 @@ Isolation level: the default READ COMMITTED is enough because every decision is 
              +-----------------------------------+      |          +----------------+
              |                                          |                           |
              v                                          v                           v
-+--------------+                 +----------------------+        +--------------------+
-|Redis Cache      |              |   Primary Database    |       |  Message Queue     |
-| (Seat Map State/Holds)|        | (ACID Transactions)   |       |(Expiring Holds)    |
-+----------------+                +------+-----------+           +--------+-----------+
-                                         |                          |                  v
-                                +------------------+         +---------------------+
-                                |   Read Replicas  |         |  Background Workers |
-                                +------------------+         +---------------------+
++----------------------+             +----------------------+    +--------------------+
+|Redis Cache           |             |  Primary Database    |    |  Message Queue     |
+|(Seat Map State/Holds)|             | (ACID Transactions)  |    |(Expiring Holds)    |
++---------------------+             +------+---------------+     +--------+-----------+
+                                           |                              |            v                              v
+                             +-------------------+               +--------------------+
+                             |   Read Replicas  |                | Background Workers |
+                             +------------------+                +--------------------+
 
 
 ### How each part helps during the sale
